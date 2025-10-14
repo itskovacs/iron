@@ -1,0 +1,12 @@
+<section>
+  <div pFocusTrap class="grid p-4">
+    <p-floatlabel variant="in" class="w-full">
+      <input id="webhook" [formControl]="webhookInput" pInputText fluid (keypress.enter)="closeDialog()" />
+      <label for="webhook">Webhook URL</label>
+    </p-floatlabel>
+  </div>
+
+  <div class="mt-4 text-right">
+    <p-button text [disabled]="!webhookInput.value" label="Create" (click)="closeDialog()" />
+  </div>
+</section>

@@ -1,0 +1,12 @@
+<section>
+  <div pFocusTrap class="grid p-4">
+    <p-floatlabel variant="in" class="w-full">
+      <input id="guid" [formControl]="guidInput" pInputText fluid (keypress.enter)="closeDialog()" />
+      <label for="guid">GUID</label>
+    </p-floatlabel>
+  </div>
+
+  <div class="mt-4 text-right">
+    <p-button text [disabled]="!guidInput.value" label="Create" (click)="closeDialog()" />
+  </div>
+</section>

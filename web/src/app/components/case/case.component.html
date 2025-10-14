@@ -1,0 +1,113 @@
+<section>
+  <div class="my-8 px-4 md:px-16 flex items-center justify-between mx-auto">
+    <img class="h-24 cursor-pointer" src="favicon.png" [routerLink]="'/'" />
+  </div>
+</section>
+
+<p-menu #caseMenu  [model]="caseMenuItems" [popup]="true" />
+<section class="my-4 px-4 md:px-16 max-w-7xl mx-auto">
+  <div [formGroup]="caseForm">
+    <div class="flex items-center justify-between">
+      <div class="flex flex-col">
+        @defer () {
+        <span class="shrink text-sm text-slate-300" pTooltip="Click to copy"
+          [cdkCopyToClipboard]="caseMeta.tsid || ''">#{{ caseMeta!.tsid || 'N/A' }}</span>
+        <h1 class="text-xl font-medium text-slate-700 dark:text-slate-200 md:text-3xl" pTooltip="Click to copy"
+          [cdkCopyToClipboard]="caseMeta.name || ''">{{ caseMeta!.name }}</h1>
+        <span class="mt-1 text-sm text-slate-500">{{ caseMeta!.description || 'No description' }}</span>
+        } @placeholder (minimum 0.4s) {
+        <p-skeleton height="1rem" width="200px"></p-skeleton>
+        <div class="mt-1"><p-skeleton height="2rem" width="400px"></p-skeleton></div>
+        }
+      </div>
+      <p-button icon="pi pi-ellipsis-h" (click)="constructCaseMenu($event)" severity="secondary" text />
+    </div>
+  </div>
+
+  <div class="bg-white dark:bg-surface-800 rounded shadow p-4 mt-8">
+    <div class="flex justify-between items-center">
+      <h1 class="mb-0 p-4 text-xl font-medium theme-text md:text-3xl">Services</h1>
+
+      <div class="flex items-center gap-2">
+        <p-button (click)="syncServices()" pTooltip="Sync services" severity="info" text><i class="pi pi-sync"
+            id="syncIcon"></i></p-button>
+        <p-button (click)="refreshServices()" pTooltip="Refresh" severity="help" text><i class="pi pi-refresh"
+            id="refreshIcon"></i></p-button>
+      </div>
+    </div>
+
+    <div class="mx-auto grid gap-1 w-full p-2">
+      @defer () {
+      @for (s of services; track s.name) {
+      <div class="flex justify-between gap-4 rounded p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-surface-700"
+        (click)="openServiceCase(s)">
+        <div class="flex gap-2 min-w-0 items-center">
+          <p class="capitalize font-semibold text-gray-900 dark:text-slate-300">{{ s.name }}
+          <p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          @if (s.status == 'Missing') {
+          <p-button (click)="attachService(s); $event.stopPropagation();" [pTooltip]="'Attach ' + s.name"
+            severity="help" text icon="pi pi-link" />
+          }
+
+          @if (s.status && ['Missing', 'Outdated'].includes(s.status)) {
+          <p-button (click)="syncService(s); $event.stopPropagation();" [pTooltip]="'Sync ' + s.name" severity="info"
+            text><i class="pi pi-sync" [attr.id]="s.name + 'Icon'"></i></p-button>
+          }
+
+          <div class="flex items-center gap-2 p-2 dark:bg-surface-900">
+            <span class="relative flex h-4 w-4 items-center justify-center">
+              @if (s.status == 'Synced') {
+              <span class="relative inline-flex h-3 w-3 rounded-full bg-green-500"></span>
+              } @else if (s.status == 'Outdated') {
+              <span class="absolute inline-flex h-full w-full animate-ping rounded-full border-2 border-orange-400 opacity-75"></span>
+              <span class="relative inline-flex h-3 w-3 rounded-full bg-orange-500"></span>
+              } @else if (s.status == 'Closed') {
+              <span class="relative inline-flex h-3 w-3 rounded-full bg-black"></span>
+              } @else if (s.status == 'Missing') {
+              <span class="relative inline-flex h-3 w-3 rounded-full bg-red-500"></span>
+              } @else {
+              <span class="relative inline-flex h-3 w-3 rounded-full bg-violet-500"></span>
+              }
+            </span>
+            <span class="text-sm font-semibold text-gray-800">{{ s.status }}</span>
+          </div>
+        </div>
+      </div>
+      }
+      } @placeholder (minimum 0.4s) {
+      <div class="grid gap-4">
+        @for(_ of [1,2,3]; track _) {
+        <p-skeleton height="5rem"></p-skeleton>
+        }
+      </div>
+      }
+    </div>
+  </div>
+
+  <div class="bg-white dark:bg-surface-800 rounded shadow p-4 mt-8">
+    <div class="p-4 flex justify-between items-center">
+      <h1 class="mb-0 text-xl font-medium theme-text md:text-3xl">Webhooks</h1>
+      <div>
+        <p-button text (click)="addWebhook()" icon="pi pi-plus" />
+        @if (caseMeta && caseMeta.webhooks.length) {<p-button text pTooltip="Remove webhooks" (click)="deleteWebhooks()"
+          icon="pi pi-trash" severity="danger" />}
+      </div>
+    </div>
+
+    @if (caseMeta) {
+    <div class="px-4 grid gap-1 w-full p-2">
+      @for (webhook of caseMeta.webhooks; track webhook) {
+      <div class="w-full flex justify-between items-center min-w-0">
+        <div class="font-mono text-sm text-gray-500">{{ webhook }}</div>
+        <p-button text (click)="deleteWebhook(webhook)" icon="pi pi-times" severity="danger" />
+      </div>
+      } @empty {
+      <div class="text-gray-500">No webhook</div>
+      }
+    </div>
+    }
+  </div>
+</section>
