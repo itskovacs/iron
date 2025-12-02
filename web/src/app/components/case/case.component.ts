@@ -20,6 +20,7 @@ import { Service } from '../../types/API';
 import { WebhookModalComponent } from '../../modals/webhook-modal/webhook-modal.component';
 import { AttachModalComponent } from '../../modals/attach-modal/attach-modal.component';
 import { CaseCreateModalComponent } from '../../modals/case-create-modal/case-create-modal.component';
+import { DeleteConfirmModalComponent } from '../../modals/delete-confirm-modal/delete-confirm-modal.component';
 
 @Component({
   selector: 'app-case',
@@ -185,13 +186,40 @@ export class CaseComponent {
   }
 
   constructCaseMenu(ev: any) {
-    const items: MenuItem[] = [
+    if (!this.caseMeta) return;
+    const closeOrReopenItem = this.caseMeta.closed
+      ? {
+          label: 'Reopen',
+          icon: 'pi pi-lock-open',
+          iconClass: 'text-green-500!',
+          command: () =>
+            this.apiService
+              .putCase(this.caseMeta!.guid, { closed: '' })
+              .pipe(take(1))
+              .subscribe({
+                next: (meta) => (this.caseMeta = meta),
+              }),
+        }
+      : {
+          label: 'Close',
+          icon: 'pi pi-times',
+          iconClass: 'text-red-500!',
+          command: () =>
+            this.apiService
+              .putCase(this.caseMeta!.guid, { closed: new Date().toISOString() })
+              .pipe(take(1))
+              .subscribe({
+                next: (meta) => (this.caseMeta = meta),
+              }),
+        };
+
+    this.caseMenuItems = [
       {
         label: 'Copy GUID',
         icon: 'pi pi-tag',
         command: () => {
           try {
-            navigator.clipboard.writeText(this.caseMeta.guid);
+            navigator.clipboard.writeText(this.caseMeta!.guid);
           } catch {
             console.error('Clipboard not available');
             this.utilsService.toast('error', 'Error', 'Clipboard not available');
@@ -204,41 +232,14 @@ export class CaseComponent {
         disabled: !!this.caseMeta.closed,
         command: () => this.openEditCaseModal(),
       },
+      closeOrReopenItem,
+      {
+        label: 'Delete',
+        icon: 'pi pi-trash',
+        iconClass: 'text-red-500!',
+        command: () => this.deleteCase(),
+      },
     ];
-
-    const closeOrReopenItem = this.caseMeta.closed
-      ? {
-          label: 'Reopen',
-          icon: 'pi pi-lock-open',
-          iconClass: 'text-green-500!',
-          command: () =>
-            this.apiService
-              .putCase(this.caseMeta!.guid, { closed: '' })
-              .pipe(take(1))
-              .subscribe({
-                next: (caseMeta) => {
-                  this.caseMeta = caseMeta;
-                  this.probeCaseServices();
-                },
-              }),
-        }
-      : {
-          label: 'Close',
-          icon: 'pi pi-times',
-          iconClass: 'text-red-500!',
-          command: () =>
-            this.apiService
-              .putCase(this.caseMeta!.guid, { closed: new Date().toISOString() })
-              .pipe(take(1))
-              .subscribe({
-                next: (caseMeta) => {
-                  this.caseMeta = caseMeta;
-                  this.probeCaseServices();
-                },
-              }),
-        };
-
-    this.caseMenuItems = [...items, closeOrReopenItem];
     this.caseMenu.toggle(ev);
   }
 
@@ -272,6 +273,30 @@ export class CaseComponent {
           this.probeCaseServices();
         },
       });
+  }
+
+  deleteCase() {
+    if (!this.caseMeta || !this.caseMeta.name) return;
+    const modal = this.dialogService.open(DeleteConfirmModalComponent, {
+      header: 'Confirm to delete',
+      modal: true,
+      closable: true,
+      dismissableMask: true,
+      breakpoints: {
+        '640px': '90vw',
+      },
+      data: this.caseMeta?.name,
+    });
+
+    modal.onClose.pipe(take(1)).subscribe((confirmed: boolean) => {
+      if (!confirmed) return;
+      this.apiService
+        .deleteCase(this.caseMeta!.guid)
+        .pipe(take(1))
+        .subscribe({
+          next: () => this.utilsService.navigateHomeWithError(),
+        });
+    });
   }
 
   attachService(service: Service) {

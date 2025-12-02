@@ -140,6 +140,10 @@ export class ApiService {
       .pipe(map((resp) => resp.data));
   }
 
+  deleteCase(caseGuid: string): Observable<any> {
+    return this.http.delete<any>(`${this.apiBaseUrl}/case/${caseGuid}`);
+  }
+
   attachCaseService(serviceName: string, caseGuid: string, attachGuid: string): Observable<CaseMetadata> {
     return this.http
       .put<
