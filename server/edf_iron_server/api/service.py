@@ -4,6 +4,7 @@ from aiohttp.web import Request
 from edf_fusion.helper.aiohttp import get_guid, json_response
 from edf_fusion.helper.logging import get_logger
 from edf_fusion.server.auth import get_fusion_auth_api
+from edf_fusion.server.event import get_fusion_evt_api
 
 from ..connector import IronConnector, get_connectors
 from .case import prologue
@@ -66,6 +67,8 @@ async def attach_service_case(request: Request):
     )
     if not svc_case:
         return json_response(status=404, message="Case not found")
+    fusion_evt_api = get_fusion_evt_api(request)
+    await fusion_evt_api.notify(category='service_attach_case', case=svc_case)
     return json_response(data=svc_case.to_dict())
 
 
@@ -89,6 +92,9 @@ async def delete_service_case(request: Request):
     deleted = await iron_connector.case_api.delete_case(case_guid)
     if not deleted:
         return json_response(status=400, message="Not deleted")
+    fusion_evt_api = get_fusion_evt_api(request)
+    svc_case = await iron_connector.case_api.retrieve_case(case_guid)
+    await fusion_evt_api.notify(category='service_delete_case', case=svc_case)
     return json_response()
 
 
@@ -146,10 +152,17 @@ async def sync_service_case(request: Request):
     )
     case = await storage.retrieve_case(case_guid)
     svc_case = await iron_connector.case_api.retrieve_case(case_guid)
+    fusion_evt_api = get_fusion_evt_api(request)
     if svc_case:
         svc_case = await iron_connector.case_api.update_case(case)
+        await fusion_evt_api.notify(
+            category='service_update_case', case=svc_case.to_dict()
+        )
     else:
         svc_case = await iron_connector.case_api.create_case(case)
+        await fusion_evt_api.notify(
+            category='service_create_case', case=svc_case.to_dict()
+        )
     if not svc_case:
         return json_response(status=500, message="Service error")
     return json_response(data=svc_case.to_dict())

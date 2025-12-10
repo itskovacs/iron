@@ -28,6 +28,15 @@ export const Interceptor = (req: HttpRequest<unknown>, next: HttpHandlerFn): Obs
           utilsService.toast('error', 'Forbidden', 'You are not allowed to do this', 3500);
           break;
 
+        case 404:
+          utilsService.toast(
+            'error',
+            'Not found',
+            `${err.error.message || err.message || 'Entity not found, check console for details'}`,
+            3500,
+          );
+          break;
+
         case 502:
           utilsService.toast('error', 'Bad Gateway', 'Verify the server is up and running');
           apiService.unauthorizedRedirectLogin();

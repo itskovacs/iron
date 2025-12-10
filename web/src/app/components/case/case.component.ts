@@ -1,4 +1,4 @@
-import { Component, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, ViewChild } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { FloatLabelModule } from 'primeng/floatlabel';
@@ -12,10 +12,10 @@ import { ClipboardModule } from '@angular/cdk/clipboard';
 import { DialogService } from 'primeng/dynamicdialog';
 import { Menu, MenuModule } from 'primeng/menu';
 import { TooltipModule } from 'primeng/tooltip';
-import { CaseMetadata } from '../../types/case';
+import { CaseMetadata, FusionEvent } from '../../types/case';
 import { UtilsService } from '../../services/utils.service';
 import { MenuItem } from 'primeng/api';
-import { catchError, forkJoin, map, of, take, tap } from 'rxjs';
+import { catchError, forkJoin, map, of, Subscription, take, tap } from 'rxjs';
 import { Service } from '../../types/API';
 import { WebhookModalComponent } from '../../modals/webhook-modal/webhook-modal.component';
 import { AttachModalComponent } from '../../modals/attach-modal/attach-modal.component';
@@ -48,9 +48,12 @@ export class CaseComponent {
   caseMeta!: CaseMetadata;
   services: Service[] = [];
   caseMenuItems: MenuItem[] = [];
+  eventSource!: Subscription;
+  activeUsers: string[] = [];
 
   constructor(
     private apiService: ApiService,
+    private cdr: ChangeDetectorRef,
     private fb: FormBuilder,
     private route: ActivatedRoute,
     private utilsService: UtilsService,
@@ -71,12 +74,59 @@ export class CaseComponent {
         tap(({ services, caseMeta }) => {
           this.services = services;
           this.caseMeta = caseMeta;
+
+          this.eventSource = this.apiService.getCaseEventsSSE(this.caseMeta!.guid).subscribe({
+            next: (event) => this.handleSSEEvent(event),
+            error: (error) => console.error('SSE error:', error),
+          });
         }),
       )
       .subscribe({
         next: () => this.probeCaseServices(),
         error: () => this.utilsService.navigateHomeWithError('Error while retrieving case'),
       });
+  }
+
+  handleSSEEvent(messageEvent: MessageEvent): void {
+    if (!messageEvent.data) return;
+    const event: FusionEvent = JSON.parse(messageEvent.data);
+    const ext = event.ext;
+    switch (event.category) {
+      case 'subscribers':
+        this.activeUsers = ext.usernames;
+        break;
+      case 'subscribe':
+        if (!this.activeUsers.includes(ext.username)) this.activeUsers.push(ext.username);
+        break;
+      case 'unsubscribe':
+        this.activeUsers = this.activeUsers.filter((u) => u !== ext.username);
+        break;
+      case 'service_delete_case':
+        this.probeCaseServices();
+        break;
+      case 'service_update_case': {
+        const service = this.services.find((s) => s.name === ext.service);
+        if (!service) break;
+        service.case_data = event.case as CaseMetadata;
+        service.status = this.computeCaseStatus(event.case);
+        break;
+      }
+      case 'update_case':
+        this.caseMeta = event.case;
+        this.probeCaseServices();
+        break;
+      case 'delete_case':
+        this.utilsService.toast('info', 'Case deleted', 'This case was deleted');
+        this.utilsService.navigateHomeWithError();
+        break;
+      default:
+        if (!event.category.startsWith('service_')) break;
+        const service = this.services.find((s) => s.name === ext.service);
+        if (!service) break;
+        service.case_data = event.case as CaseMetadata;
+        service.status = this.computeCaseStatus(event.case);
+        break;
+    }
   }
 
   computeCaseStatus(serviceCaseMeta: CaseMetadata | null): string {
@@ -264,15 +314,7 @@ export class CaseComponent {
   }
 
   updateCase(data: Partial<CaseMetadata>) {
-    this.apiService
-      .putCase(this.caseMeta!.guid, data)
-      .pipe(take(1))
-      .subscribe({
-        next: (caseMeta) => {
-          this.caseMeta = caseMeta;
-          this.probeCaseServices();
-        },
-      });
+    this.apiService.putCase(this.caseMeta!.guid, data).pipe(take(1)).subscribe();
   }
 
   deleteCase() {
@@ -290,12 +332,7 @@ export class CaseComponent {
 
     modal.onClose.pipe(take(1)).subscribe((confirmed: boolean) => {
       if (!confirmed) return;
-      this.apiService
-        .deleteCase(this.caseMeta!.guid)
-        .pipe(take(1))
-        .subscribe({
-          next: () => this.utilsService.navigateHomeWithError(),
-        });
+      this.apiService.deleteCase(this.caseMeta!.guid).pipe(take(1)).subscribe();
     });
   }
 
@@ -314,15 +351,7 @@ export class CaseComponent {
 
     modal.onClose.pipe(take(1)).subscribe((guid: string) => {
       if (!guid) return;
-      this.apiService
-        .attachCaseService(service.name, guid, this.caseMeta!.guid)
-        .pipe(take(1))
-        .subscribe({
-          next: (caseMeta) => {
-            this.caseMeta = caseMeta;
-            this.probeCaseServices();
-          },
-        });
+      this.apiService.attachCaseService(service.name, guid, this.caseMeta!.guid).pipe(take(1)).subscribe();
     });
   }
 
